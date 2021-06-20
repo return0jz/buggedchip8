@@ -186,7 +186,7 @@ int main(int argc, char const** argv) {
             std::memset(display,0,2048);
         }
         else if (instruction==0x00EE) { // 00EE - RET
-            programCounter=stack[(stackPointer-1)%16];
+            programCounter=stack[(stackPointer-1)];
             stackPointer--;
         }
         else if ((instruction & 0xF000) == 0x1000) { // 1nnn - JP addr
@@ -194,7 +194,7 @@ int main(int argc, char const** argv) {
         }
         else if ((instruction & 0xF000) == 0x2000) { // 2nnn - CALL addr
             stackPointer++;
-            stack[(stackPointer-1)%16] = programCounter;
+            stack[(stackPointer-1)] = programCounter;
             programCounter = instruction & 0x0FFF;
         }
         else if ((instruction & 0xF000) == 0x3000) { // 3xkk - SE Vx, byte
@@ -342,6 +342,18 @@ int main(int argc, char const** argv) {
                 registers[i] = memory[I+i];
             }
         }
+        if (delay > 0) {
+            delay--;
+            if (delay < 0) {
+                delay=0;
+            }
+        }
+        if (sound > 0) {
+            sound--;
+            if (sound < 0) {
+                sound = 0;
+            }
+        }
         //draw
         for (int i = 0; i < 2048;i++) {
             screenPixels.setPixel(i%64, i/64, sf::Color(display[i]*255,display[i]*255,display[i]*255));
@@ -355,3 +367,4 @@ int main(int argc, char const** argv) {
 
     return 0;
 }
+
