@@ -1,370 +1,479 @@
-#include <SFML/Audio.hpp>
-#include <SFML/Graphics.hpp>
-#include <cstdlib>
 #include <iostream>
-#include <ios>
-#include <cstdio>
+#include <vector>
+#include <memory>
+#include <stack>
+#include <SDL2/SDL.h>
 #include <cstdint>
-#include <utility>
-#include <fstream>
+#include <array>
 
-int main(int argc, char const** argv) {
-    std::uint8_t *memory = new std::uint8_t[4096];
-    bool *display = new bool[2048];
-    bool *keystates = new bool[16];
-    std::uint16_t stack[16];
-    std::uint8_t registers[16];
+class emulator {
+public:
+    emulator() :
+    memory(new std::array<std::uint8_t,4096>),
+    display(new std::array<std::uint8_t,2048>)
     
-    
-    std::memset(memory, 0, 4096);
-    std::memset(display, 0, 2048);
-    std::memset(stack, 0, 32);
-    std::memset(registers, 0, 16);
-    std::memset(keystates, 0, 16);
-    // FONTS
-    
-    //0
-    memory[0] = 0xF0;
-    memory[1] = 0x90;
-    memory[2] = 0x90;
-    memory[3] = 0x90;
-    memory[4] = 0xF0;
-    //1
-    memory[5] = 0x20;
-    memory[6] = 0x60;
-    memory[7] = 0x20;
-    memory[8] = 0x20;
-    memory[9] = 0x70;
-    //2
-    memory[10] = 0xF0;
-    memory[11] = 0x10;
-    memory[12] = 0xF0;
-    memory[13] = 0x80;
-    memory[14] = 0xF0;
-    //3
-    memory[15] = 0xF0;
-    memory[16] = 0x10;
-    memory[17] = 0xF0;
-    memory[18] = 0x10;
-    memory[19] = 0xF0;
-    //4
-    memory[20] = 0x90;
-    memory[21] = 0x90;
-    memory[22] = 0xF0;
-    memory[23] = 0x10;
-    memory[24] = 0x10;
-    //5
-    memory[25] = 0xF0;
-    memory[26] = 0x80;
-    memory[27] = 0xF0;
-    memory[28] = 0x10;
-    memory[29] = 0xF0;
-    //6
-    memory[30] = 0xF0;
-    memory[31] = 0x80;
-    memory[32] = 0xF0;
-    memory[33] = 0x90;
-    memory[34] = 0xF0;
-    //7
-    memory[35] = 0xF0;
-    memory[36] = 0x10;
-    memory[37] = 0x20;
-    memory[38] = 0x40;
-    memory[39] = 0x40;
-    //8
-    memory[40] = 0xF0;
-    memory[41] = 0x90;
-    memory[42] = 0xF0;
-    memory[43] = 0x90;
-    memory[44] = 0xF0;
-    //9
-    memory[45] = 0xF0;
-    memory[46] = 0x90;
-    memory[47] = 0xF0;
-    memory[48] = 0x10;
-    memory[49] = 0xF0;
-    //A
-    memory[50] = 0xF0;
-    memory[51] = 0x90;
-    memory[52] = 0xF0;
-    memory[53] = 0x90;
-    memory[54] = 0x90;
-    //B
-    memory[55] = 0xE0;
-    memory[56] = 0x90;
-    memory[57] = 0xE0;
-    memory[58] = 0x90;
-    memory[59] = 0xE0;
-    //C
-    memory[60] = 0xF0;
-    memory[61] = 0x80;
-    memory[62] = 0x80;
-    memory[63] = 0x80;
-    memory[64] = 0xF0;
-    //D
-    memory[65] = 0xE0;
-    memory[66] = 0x90;
-    memory[67] = 0x90;
-    memory[68] = 0x90;
-    memory[69] = 0xE0;
-    //E
-    memory[70] = 0xF0;
-    memory[71] = 0x80;
-    memory[72] = 0xF0;
-    memory[73] = 0x80;
-    memory[74] = 0xF0;
-    //F
-    memory[75] = 0xF0;
-    memory[76] = 0x80;
-    memory[77] = 0xF0;
-    memory[78] = 0x80;
-    memory[79] = 0x80;
-    
-    if (argc != 2) {
-        std::cout << "Pass one argument please." << std::endl;
-        return 0;
-    } else {
-        std::FILE *fileHandle = std::fopen(argv[1], "r");
-        std::fread(&(memory[512]), 1, 3584, fileHandle);
-        std::fclose(fileHandle);
+    {
+        std::fill(memory->begin(), memory->end(), 0);
+        std::fill(display->begin(),display->end(),0);
+        std::fill(v.begin(), v.end(), 0);
+        std::array<std::uint8_t,80> fontset= {
+            0xF0, 0x90, 0x90, 0x90, 0xF0,        // 0
+            0x20, 0x60, 0x20, 0x20, 0x70,        // 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0,        // 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0,        // 3
+            0x90, 0x90, 0xF0, 0x10, 0x10,        // 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0,        // 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0,        // 6
+            0xF0, 0x10, 0x20, 0x40, 0x40,        // 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0,        // 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0,        // 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90,        // A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0,        // B
+            0xF0, 0x80, 0x80, 0x80, 0xF0,        // C
+            0xE0, 0x90, 0x90, 0x90, 0xE0,        // D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0,        // E
+            0xF0, 0x80, 0xF0, 0x80, 0x80        // F
+        };
+        for (int i = 0; i < 80;i++) {
+            memory->at(i) = fontset[i];
+        }
+        I = 0;
+        sound = 0;
+        delay = 0;
+        pc = 0x200;
     }
-    
-    std::uint16_t I=0;
-    std::uint8_t delay=0;
-    std::uint8_t sound=0;
+    void fetch() {
+        if (pc > 4094) {
+            pc = 0x200;
+        }
+        opcode = (memory->at(pc) << 8) | (memory->at(pc+1));
+        std::cout << std::hex << "pc: " << pc << " ";
+        std::cout << "opc: "<< (int) opcode << std::endl;
 
-    std::uint16_t programCounter=0x0200;
-    std::uint8_t stackPointer=0;
-    
-    sf::Image screenPixels;
-    screenPixels.create(64, 32);
-    sf::Texture screenTexture;
-    sf::Sprite screenSprite;
-    
-    sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
-    window.setFramerateLimit(60);
-    
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
-                window.close();
-            }
-        }
-        keystates[0] = sf::Keyboard::isKeyPressed(sf::Keyboard::Num1);
-        keystates[1] = sf::Keyboard::isKeyPressed(sf::Keyboard::Num2);
-        keystates[2] = sf::Keyboard::isKeyPressed(sf::Keyboard::Num3);
-        keystates[3] = sf::Keyboard::isKeyPressed(sf::Keyboard::Num4);
-        keystates[4] = sf::Keyboard::isKeyPressed(sf::Keyboard::Q);
-        keystates[5] = sf::Keyboard::isKeyPressed(sf::Keyboard::W);
-        keystates[6] = sf::Keyboard::isKeyPressed(sf::Keyboard::E);
-        keystates[7] = sf::Keyboard::isKeyPressed(sf::Keyboard::R);
-        keystates[8] = sf::Keyboard::isKeyPressed(sf::Keyboard::A);
-        keystates[9] = sf::Keyboard::isKeyPressed(sf::Keyboard::S);
-        keystates[10] = sf::Keyboard::isKeyPressed(sf::Keyboard::D);
-        keystates[11] = sf::Keyboard::isKeyPressed(sf::Keyboard::F);
-        keystates[12] = sf::Keyboard::isKeyPressed(sf::Keyboard::Z);
-        keystates[13] = sf::Keyboard::isKeyPressed(sf::Keyboard::X);
-        keystates[14] = sf::Keyboard::isKeyPressed(sf::Keyboard::C);
-        keystates[15] = sf::Keyboard::isKeyPressed(sf::Keyboard::V);
-        // fetch
-        if (programCounter >= 4094) {
-            std::cout << "CHIP-8 message: Program counter reached end of memory." << std::endl;
-            std::exit(0);
-        }
-        std::uint16_t instruction = (memory[programCounter] << 8) + memory[programCounter+1];
-        //std::cout << programCounter << std::endl;
-        std::cout << std::hex << (int) instruction << std::endl;
-        programCounter=programCounter+2;
-        // execute
-        if (instruction==0x00E0) {  // 00E0 - CLS
-            std::memset(display,0,2048);
-        }
-        else if (instruction==0x00EE) { // 00EE - RET
-            programCounter=stack[(stackPointer-1)];
-            stackPointer--;
-        }
-        else if ((instruction & 0xF000) == 0x1000) { // 1nnn - JP addr
-            programCounter=instruction & 0x0FFF;
-        }
-        else if ((instruction & 0xF000) == 0x2000) { // 2nnn - CALL addr
-            stackPointer++;
-            stack[(stackPointer-1)] = programCounter;
-            programCounter = instruction & 0x0FFF;
-        }
-        else if ((instruction & 0xF000) == 0x3000) { // 3xkk - SE Vx, byte
-            if (registers[(instruction & 0x0F00)>>8] == (instruction & 0x00FF)) {
-                programCounter+=2;
-            }
-        }
-        else if ((instruction & 0xF000) == 0x4000) { // 4xkk - SNE Vx, byte
-            if (registers[(instruction & 0x0F00)>>8] == (instruction & 0x00FF)) {
-            } else {
-                programCounter+=2;
-            }
-        }
-        else if (((instruction & 0xF000)==0x5000) && ((instruction & 0x000F) == 0x0000)) { //5xy0 - SE Vx, VY
-            if (registers[(instruction & 0x0F00)>>8] == registers[(instruction & 0x00F0)>>4]) {
-                programCounter+=2;
-            }
-        } else if ((instruction & 0xF000)==0x6000) { // 6XNN - LD Vx, byte
-            registers[(instruction & 0x0F00)>>8] = (instruction & 0x00FF);
-        }
-        else if ((instruction & 0xF000)==0x7000) { // 7XNN - ADD Vx, byte
-            registers[(instruction & 0x0F00)>>8] += instruction & 0x00FF;
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0000)) { // 8xy0 - LD Vx, Vy
-            registers[(instruction & 0x0F00)>>8] = registers[(instruction & 0x00F0)>>4];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0001)) { // 8xy1 - OR Vx, Vy
-            registers[(instruction & 0x0F00)>>8] |= registers[(instruction & 0x00F0)>>4];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0002)) { // 8xy2 - AND Vx, Vy
-            registers[(instruction & 0x0F00)>>8] &= registers[(instruction & 0x00F0)>>4];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0003)) { // 8xy3 - XOR Vx, Vy
-            registers[(instruction & 0x0F00)>>8] ^= registers[(instruction & 0x00F0)>>4];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0004)) { // 8xy4 - ADD Vx, Vy (set VF)
-            if ((int) registers[(instruction & 0x0F00)>>8] + (int) registers[(instruction & 0x00F0)>>4] > 256) {
-                registers[15] = 1;
-            } else {
-                registers[15] = 0;
-            }
-            registers[(instruction&0x0F00)>>8] += registers[(instruction&0x00F0)>>4];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0005)) { // 8xy5 - SUB Vx, Vy (set VF)
-            if ((int) registers[(instruction & 0x0F00)>>8] - (int) registers[(instruction & 0x00F0)>>4] >= 0) {
-                registers[15] = 1;
-            } else {
-                registers[15] = 0;
-            }
-            registers[(instruction&0x0F00)>>8] -= registers[(instruction&0x00F0)>>4];
-        }
-        else if ((instruction & 0xF00F)==0x8006) { // 8xy6 - SHR Vx { ,Vy} (set VF)
-            registers[15] = registers[(instruction&0x0F00)>>8]&1;
-            registers[(instruction&0x0F00)>>8] >>= 1;
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x0007)) { // 8xy7 - SUBN Vx, Vy
-            registers[15] = registers[(instruction&0x0F00)>>8] < registers[(instruction&0x00F0)>>4];
-            registers[(instruction&0x0F00)>>8] = registers[(instruction&0x00F0)>>4] - registers[(instruction&0x0F00)>>8];
-        }
-        else if (((instruction & 0xF000)==0x8000) && ((instruction & 0x000F) == 0x000E)) { // 8xyE - SHL Vx {, VY}
-            registers[15] = (registers[(instruction&0x0F00)>>8]&0x80)>>7;
-            registers[(instruction&0x0F00)>>8] = registers[(instruction&0x00F0)>>4] << 2;
-        }
-        else if (((instruction & 0xF000)==0x9000)&&((instruction & 0x000F)==0x0000)) { //9xy0 - SNE Vx, Vy
-            if (registers[(instruction&0x0F00)>>8] == registers[(instruction&0x00F0)>>4]) {
-            } else {
-                programCounter+=2;
-            }
-        }
-        else if ((instruction & 0xF000) == 0xA000) { // Annn - LD I, addr
-            I = instruction & 0x0FFF;
-        }
-        else if ((instruction & 0xF000) == 0xB000) { // Bnnn - JP V0, addr
-            programCounter = (std::uint16_t) (instruction & 0x0FFF) + registers[0];
-        }
-        else if ((instruction & 0xF000) == 0xC000) { // Cxkk - RND Vx, byte
-            registers[(instruction & 0x0F00)>>8] = (std::rand()%256) & (instruction & 0x00FF);
-        }
-        else if ((instruction & 0xF000) == 0xD000) { // Dxyn - DRW Vx, Vy, nibble
-            registers[15] = 0;
-            for (int y = 0; y < (instruction & 0x000F);y++) {
-                for (int x = 0; x < 8;x++) {
-                    if (memory[I+y] & (128 >> x)) {
-                        if ( (registers[((instruction & 0x0F00)>>8)]+x) >= 0 &&  (registers[((instruction & 0x0F00)>>8)]+x) <= 64 && (registers[((instruction & 0x00F0)>>4)]+y) >= 0 && (registers[((instruction & 0x00F0)>>4)]+y) <= 32) {
-                            if (display[registers[((instruction & 0x0F00)>>8)]+x +(registers[((instruction & 0x00F0)>>4)]+y)*64]) {
-                                registers[15] = 1;
-                            }
-                            display[registers[((instruction & 0x0F00)>>8)]+x +(registers[((instruction & 0x00F0)>>4)]+y)*64] ^= 1;
-
+        x = (opcode & 0x0F00)>>8;
+        y = (opcode & 0x00F0)>>4;
+        nnn = opcode & 0x0FFF;
+        n = opcode & 0x000F;
+        kk = opcode & 0x00FF;
+    }
+    void execute() {
+        switch (opcode & 0xF000) {
+            case 0x0000:
+                switch(opcode & 0x00FF) {
+                    case 0x0000: // NULL instruction
+                        pc+=2;
+                        break;
+                    case 0x00E0:
+                        std::fill(display->begin(), display->end(), 0);
+                        pc += 2;
+                        break;
+                    case 0x00EE:
+                        pc = stack.top();
+                        stack.pop();
+                        break;
+                }
+                break;
+            case 0x1000:
+                pc = nnn;
+                break;
+            case 0x2000:
+                stack.push(pc);
+                pc = nnn;
+                break;
+            case 0x3000:
+                if (v[x] == kk) {
+                    pc+=2;
+                }
+                pc+=2;
+                break;
+            case 0x4000:
+                if (v[x] != kk) {
+                    pc+=2;
+                }
+                pc+=2;
+                break;
+            case 0x5000:
+                if (v[x] == v[y]) {
+                    pc+=2;
+                }
+                pc+=2;
+                break;
+            case 0x6000:
+                v[x] = kk;
+                pc+=2;
+                break;
+            case 0x7000:
+                v[x] += kk;
+                pc+=2;
+                break;
+            case 0x8000:
+                switch (opcode & 0x000F) {
+                    case 0x0000:
+                        v[x]= v[y];
+                        pc+=2;
+                        break;
+                    case 0x0001:
+                        v[x] |= v[y];
+                        pc+=2;
+                        break;
+                    case 0x0002:
+                        v[x] &= v[y];
+                        pc+=2;
+                        break;
+                    case 0x0003:
+                        v[x] ^= v[y];
+                        pc+=2;
+                        break;
+                    case 0x0004:
+                        v[0xF] = 0;
+                        if ( ((int) v[x] + (int) v[y]) > 0xFF) {
+                            v[0xF] = 1;
                         }
+                        v[x] += v[y];
+                        pc+=2;
+                        break;
+                    case 0x0005:
+                        v[0xF] = 0;
+                        if (v[x] > v[y]) {
+                            v[0xF] = 1;
+                        }
+                        v[x] -= v[y];
+                        pc+=2;
+                        break;
+                    case 0x0006:
+                        v[0xF] &= 0x01;
+                        v[x] >>= 1;
+                        pc+=2;
+                    case 0x0007:
+                        v[0xF] = 0;
+                        if (v[x] < v[y]) {
+                            v[0xF] = 1;
+                        }
+                        v[x] = v[y] - v[x];
+                        pc+=2;
+                        break;
+                    case 0x000E:
+                        v[0xF] &= 0x80;
+                        v[x] <<= 1;
+                        pc+=2;
+                        break;
+                }
+                break;
+            case 0x9000:
+                if (v[x] != v[y]) {
+                    pc+=2;
+                }
+                pc+=2;
+                break;
+            case 0xA000:
+                I = nnn;
+                pc+=2;
+                break;
+            case 0xB000:
+                pc=nnn+v[0];
+                break;
+            case 0xC000:
+                v[x] = (std::uint8_t) (std::rand() % 255) & kk;
+                pc+=2;
+                break;
+            case 0xD000: {
+                v[0xF] = 0;
+                std::uint8_t vx = v[x];
+                std::uint8_t vy = v[y];
+                for (int i = 0; i < n;i++) {
+                    std::uint8_t row = memory->at(I+i);
+                    for (int p = 8; p > 0; p--) {
+                        bool val = getBit(row, p);
+                        std::uint8_t tx = (vx + (8-p)) %64;
+                        std::uint8_t ty = (vy + i) % 32;
+                        if (display->at( tx + (ty*64))) {
+                            v[0xF] = 1;
+                        }
+                        display->at( tx + (ty*64)) ^= val;
                     }
                 }
+                pc+=2;
             }
-        }
-        else if ( ((instruction & 0xF000) == 0xE000) && ((instruction & 0x00F0) == 0x0090) && ((instruction & 0x000F) == 0x000E)) {
-            if (keystates[registers[(instruction & 0x0F00)>>8]]) {
-                programCounter+=2;
-            }
-        }
-        else if ( ((instruction & 0xF000) == 0xE000) && ((instruction & 0x00F0) == 0x00A0) && ((instruction & 0x000F) == 0x0001)) {
-            if (!(keystates[registers[(instruction & 0x0F00)>>8]])) {
-                programCounter+=2;
-            }
-        }
-        else if ((instruction & 0xF0FF)==0xF007) {
-            registers[(instruction & 0x0F00)>>8] = delay;
-        }
-        else if ((instruction & 0xF0FF)==0xF00A) {
-            int val = false;
-            for (int i = 0; i < 16;i++) {
-                if(keystates[i] == true) {
-                    val = true;
-                    registers[(instruction & 0x0F00)>>8]=i;
-                    break;
+                break;
+            case 0xE000:
+                switch (opcode & 0x00FF) {
+                    case 0x009E:
+                        if (key[x]) {
+                            pc+=2;
+                        }
+                        pc+=2;
+                        break;
+                    case 0x00A1:
+                        if (!key[x]) {
+                            pc+=2;
+                        }
+                        pc+=2;
                 }
-            }
-            if (!val) {
-                programCounter-=2;
-            }
+                break;
+            case 0xF000:
+                switch (opcode & 0x00FF) {
+                    case 0x0007:
+                        v[x] = delay;
+                        pc+=2;
+                        break;
+                    case 0x000A:
+                        for (int i = 0; i < 0xF;i++) {
+                            if (key[i]) {
+                                v[x] = i;
+                                pc+=2;
+                                break;
+                            }
+                        }
+                        break;
+                    case 0x0015:
+                        delay = v[x];
+                        pc+=2;
+                        break;
+                    case 0x0018:
+                        sound = v[x];
+                        pc+=2;
+                        break;
+                    case 0x001E:
+                        I += v[x];
+                        pc+=2;
+                        break;
+                    case 0x0029:
+                        I = memory->at( (v[x]&0x000F) * 5) ;
+                        pc+=2;
+                        break;
+                    case 0x0033:
+                        memory->at(I) = (int) v[x] / 100;
+                        memory->at(I+1) = ((int) v[x] % 100)/10;
+                        memory->at(I+2) = (int) v[x] % 10;
+                        break;
+                    case 0x0055:
+                        for (int i = 0; i < (x);i++) {
+                            memory->at(I+i) = v[i];
+                        }
+                        break;
+                    case 0x0065:
+                        for (int i = 0; i < (x);i++) {
+                            v[i] = memory->at(I+i);
+                        }
+                        break;
+                }
         }
-        else if ((instruction & 0xF0FF)==0xF015) {
-            delay = registers[(instruction & 0x0F00)>>8];
+    }
+    
+    static bool getBit(std::uint8_t byte, std::uint8_t pos) {
+        if (pos > 8) {
+            return (byte >> 7)&1;
         }
-        else if ((instruction & 0xF0FF)==0xF018) {
-            sound = registers[(instruction & 0x0F00)>>8];
+        if (pos < 1) {
+            return byte & 1;
         }
-        else if ((instruction & 0xF0FF)==0xF01E) {
-            I += registers[(instruction & 0x0F00)>>8];
-        }
-        else if ((instruction & 0xF0FF)==0xF029) {
-            I = ((registers[(instruction & 0x0F00)>>8] & 0x000F)*5)-1;
-        }
-        else if ((instruction & 0xF0FF)==0xF033) {
-            memory[I] = registers[(instruction & 0x0F00)>>8]/100;
-            memory[I+1] = (registers[(instruction & 0x0F00)>>8]/10)%10;
-            memory[I+2] = (registers[(instruction & 0x0F00)>>8])%10;
-        }
-        else if ((instruction & 0xF0FF)==0xF055) {
-            for (int i = 0; i <15;i++) {
-                memory[I+i] = registers[i];
-            }
-        }
-        else if ((instruction & 0xF0FF)==0xF065) {
-            for (int i = 0; i < 15;i++) {
-                registers[i] = memory[I+i];
-            }
-        }
+        return (byte >> (pos-1)) & 1;
+    }
+    
+    void updateTimers() {
         if (delay > 0) {
             delay--;
-            if (delay < 0) {
-                delay=0;
-            }
         }
         if (sound > 0) {
             sound--;
-            if (sound < 0) {
-                sound = 0;
-            }
         }
-        //draw
-        for (int i = 0; i < 2048;i++) {
-            screenPixels.setPixel(i%64, i/64, sf::Color(display[i]*255,display[i]*255,display[i]*255));
-        }
-        screenTexture.loadFromImage(screenPixels);
-        screenSprite.setTexture(screenTexture);
-        screenSprite.setScale(10, 10);
-        window.draw(screenSprite);
-        window.display();
     }
+    
+    void readFromFile(std::string str) {
+        std::FILE *fileHandle = nullptr;
+        fileHandle = std::fopen(str.data(), "r");
+        if (fileHandle) {
+            std::fread(&(memory->at(512)), 1, 3584, fileHandle);
+            std::fclose(fileHandle);
+        }
 
+    }
+    
+    void draw(SDL_Renderer *renderer) {
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_Rect rect;
+        rect.w = 10;
+        rect.h = 10;
+        for (int i = 0; i < 2048;i++) {
+            rect.x = (i%64) * rect.w;
+            rect.y = (i/64)*rect.h;
+            if (display->at(i))
+                SDL_RenderFillRect(renderer, &rect);
+        }
+        SDL_RenderPresent(renderer);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    }
+    
+    void handleInput(SDL_Event &event) {
+        switch (event.type) {
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.sym) {
+                    case SDLK_1:
+                        key[0x1] = true;
+                        break;
+                    case SDLK_2:
+                        key[0x2] = true;
+                        break;
+                    case SDLK_3:
+                        key[0x3] = true;
+                        break;
+                    case SDLK_4:
+                        key[0xC] = true;
+                        break;
+                    case SDLK_q:
+                        key[0x4] = true;
+                        break;
+                    case SDLK_w:
+                        key[0x5] = true;
+                        break;
+                    case SDLK_e:
+                        key[0x6] = true;
+                        break;
+                    case SDLK_r:
+                        key[0xD] = true;
+                        break;
+                    case SDLK_a:
+                        key[0x7] = true;
+                        break;
+                    case SDLK_s:
+                        key[0x8] = true;
+                        break;
+                    case SDLK_d:
+                        key[0x9] = true;
+                        break;
+                    case SDLK_f:
+                        key[0xE] = true;
+                        break;
+                    case SDLK_z:
+                        key[0xA] = true;
+                        break;
+                    case SDLK_x:
+                        key[0x0] = true;
+                        break;
+                    case SDLK_c:
+                        key[0xB] = true;
+                        break;
+                    case SDLK_v:
+                        key[0xF] = true;
+                        break;
+                }
+                break;
+            case SDL_KEYUP:
+                switch (event.key.keysym.sym) {
+                    case SDLK_1:
+                        key[0x1] = false;
+                        break;
+                    case SDLK_2:
+                        key[0x2] = false;
+                        break;
+                    case SDLK_3:
+                        key[0x3] = false;
+                        break;
+                    case SDLK_4:
+                        key[0xC] = false;
+                        break;
+                    case SDLK_q:
+                        key[0x4] = false;
+                        break;
+                    case SDLK_w:
+                        key[0x5] = false;
+                        break;
+                    case SDLK_e:
+                        key[0x6] = false;
+                        break;
+                    case SDLK_r:
+                        key[0xD] = false;
+                        break;
+                    case SDLK_a:
+                        key[0x7] = false;
+                        break;
+                    case SDLK_s:
+                        key[0x8] = false;
+                        break;
+                    case SDLK_d:
+                        key[0x9] = false;
+                        break;
+                    case SDLK_f:
+                        key[0xE] = false;
+                        break;
+                    case SDLK_z:
+                        key[0xA] = false;
+                        break;
+                    case SDLK_x:
+                        key[0x0] = false;
+                        break;
+                    case SDLK_c:
+                        key[0xB] = false;
+                        break;
+                    case SDLK_v:
+                        key[0xF] = false;
+                        break;
+                }
+                break;
+        }
+    }
+    
+private:
+    // vm variables
+    std::unique_ptr<std::array<std::uint8_t,4096>> memory;
+    std::unique_ptr<std::array<std::uint8_t,2048>> display;
+
+    std::array<uint8_t,16> v;
+    std::uint16_t I;
+    std::uint8_t delay;
+    std::uint8_t sound;
+    
+    std::stack<uint16_t> stack;
+    std::uint16_t pc;
+    
+    std::array<uint8_t,16> key;
+    // For easy access
+    std::uint16_t opcode;
+    
+    std::uint8_t x;
+    std::uint8_t y;
+    std::uint16_t nnn;
+    std::uint8_t n;
+    std::uint8_t kk;
+};
+
+int main(int argc, const char * argv[]) {
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window *window = SDL_CreateWindow("CHIP-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, 0);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+    emulator chip8;
+    SDL_Event event;
+    bool run=true;
+    
+    double oldTime1=0;
+    double newTime1=0;
+    double oldTime2 = 0;
+    double newTime2 = 0;
+    
+    if (argc >= 2) {
+        chip8.readFromFile(argv[1]);
+    }
+    while(run) {
+        newTime1 = SDL_GetTicks();
+        newTime2 = SDL_GetTicks();
+        if (newTime1 >= oldTime1+(1/60.0)) {
+            oldTime1 = newTime1;
+            chip8.updateTimers();
+            chip8.draw(renderer);
+        }
+
+        if (newTime2 >= oldTime2+(1/700.0)) {
+            oldTime2 = oldTime2;
+            chip8.fetch();
+            chip8.execute();
+        }
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                run=false;
+            }
+            chip8.handleInput(event);
+        }
+    }
     return 0;
 }
-
