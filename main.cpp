@@ -14,6 +14,9 @@ public:
     
     {
         std::fill(memory->begin(), memory->end(), 0);
+        for (int i = 0; i < 16;i++) {
+            key[i] = 0;
+        }
         std::fill(display->begin(),display->end(),0);
         std::fill(v.begin(), v.end(), 0);
         std::array<std::uint8_t,80> fontset= {
@@ -63,56 +66,56 @@ public:
                     case 0x0000: // NULL instruction
                         pc+=2;
                         break;
-                    case 0x00E0:
+                    case 0x00E0: // Clear screen
                         std::fill(display->begin(), display->end(), 0);
                         pc += 2;
                         break;
-                    case 0x00EE:
-                        pc = stack.top();
+                    case 0x00EE: // Return from function
+                        pc = stack.top()+2;
                         stack.pop();
                         break;
                 }
                 break;
-            case 0x1000:
+            case 0x1000: // Jump to nnn
                 pc = nnn;
                 break;
-            case 0x2000:
+            case 0x2000: // Call function
                 stack.push(pc);
                 pc = nnn;
                 break;
-            case 0x3000:
+            case 0x3000: // Skip if vx = byte
                 if (v[x] == kk) {
                     pc+=2;
                 }
                 pc+=2;
                 break;
-            case 0x4000:
+            case 0x4000: // Skip if vx != byte
                 if (v[x] != kk) {
                     pc+=2;
                 }
                 pc+=2;
                 break;
-            case 0x5000:
+            case 0x5000: // Skip if vx = vy
                 if (v[x] == v[y]) {
                     pc+=2;
                 }
                 pc+=2;
                 break;
-            case 0x6000:
+            case 0x6000: // Load byte into vx
                 v[x] = kk;
                 pc+=2;
                 break;
-            case 0x7000:
+            case 0x7000: // Add byte to vx
                 v[x] += kk;
                 pc+=2;
                 break;
             case 0x8000:
                 switch (opcode & 0x000F) {
-                    case 0x0000:
+                    case 0x0000: // Load vy into vx
                         v[x]= v[y];
                         pc+=2;
                         break;
-                    case 0x0001:
+                    case 0x0001: //
                         v[x] |= v[y];
                         pc+=2;
                         break;
@@ -141,7 +144,7 @@ public:
                         pc+=2;
                         break;
                     case 0x0006:
-                        v[0xF] &= 0x01;
+                        v[0xF] = v[x] & 0x01;
                         v[x] >>= 1;
                         pc+=2;
                     case 0x0007:
@@ -153,7 +156,7 @@ public:
                         pc+=2;
                         break;
                     case 0x000E:
-                        v[0xF] &= 0x80;
+                        v[0xF] = v[x] & 0x80;
                         v[x] <<= 1;
                         pc+=2;
                         break;
@@ -208,6 +211,7 @@ public:
                             pc+=2;
                         }
                         pc+=2;
+                        break;
                 }
                 break;
             case 0xF000:
@@ -245,16 +249,19 @@ public:
                         memory->at(I) = (int) v[x] / 100;
                         memory->at(I+1) = ((int) v[x] % 100)/10;
                         memory->at(I+2) = (int) v[x] % 10;
+                        pc+=2;
                         break;
                     case 0x0055:
-                        for (int i = 0; i < (x);i++) {
+                        for (int i = 0; i <= (x);i++) {
                             memory->at(I+i) = v[i];
                         }
+                        pc+=2;
                         break;
                     case 0x0065:
-                        for (int i = 0; i < (x);i++) {
+                        for (int i = 0; i <= (x);i++) {
                             v[i] = memory->at(I+i);
                         }
+                        pc+=2;
                         break;
                 }
         }
