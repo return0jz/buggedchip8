@@ -14,9 +14,7 @@ public:
     
     {
         std::fill(memory->begin(), memory->end(), 0);
-        for (int i = 0; i < 16;i++) {
-            key[i] = 0;
-        }
+        std::fill(key.begin(), key.end(),0);
         std::fill(display->begin(),display->end(),0);
         std::fill(v.begin(), v.end(), 0);
         std::array<std::uint8_t,80> fontset= {
@@ -50,8 +48,8 @@ public:
             pc = 0x200;
         }
         opcode = (memory->at(pc) << 8) | (memory->at(pc+1));
-        std::cout << std::hex << "pc: " << pc << " ";
-        std::cout << "opc: "<< (int) opcode << std::endl;
+        //std::cout << std::hex << "pc: " << pc << " ";
+        //std::cout << "opc: "<< (int) opcode << std::endl;
 
         x = (opcode & 0x0F00)>>8;
         y = (opcode & 0x00F0)>>4;
@@ -147,6 +145,7 @@ public:
                         v[0xF] = v[x] & 0x01;
                         v[x] >>= 1;
                         pc+=2;
+                        break;
                     case 0x0007:
                         v[0xF] = 0;
                         if (v[x] < v[y]) {
@@ -156,7 +155,7 @@ public:
                         pc+=2;
                         break;
                     case 0x000E:
-                        v[0xF] = v[x] & 0x80;
+                        v[0xF] = (v[x] >> 7) & 0x01;
                         v[x] <<= 1;
                         pc+=2;
                         break;
@@ -221,7 +220,7 @@ public:
                         pc+=2;
                         break;
                     case 0x000A:
-                        for (int i = 0; i < 0xF;i++) {
+                        for (int i = 0; i <= 0xF;i++) {
                             if (key[i]) {
                                 v[x] = i;
                                 pc+=2;
@@ -242,7 +241,7 @@ public:
                         pc+=2;
                         break;
                     case 0x0029:
-                        I = memory->at( (v[x]&0x000F) * 5) ;
+                        I = (v[x]&0x000F) * 5;
                         pc+=2;
                         break;
                     case 0x0033:
@@ -470,8 +469,8 @@ int main(int argc, const char * argv[]) {
             chip8.draw(renderer);
         }
 
-        if (newTime2 >= oldTime2+(1/700.0)) { // Instructions per second
-            oldTime2 = oldTime2;
+        if (newTime2 >= oldTime2+(1/100.0)) { // Instructions per second
+            oldTime2 = newTime2;
             chip8.fetch();
             chip8.execute();
         }
@@ -484,4 +483,5 @@ int main(int argc, const char * argv[]) {
     }
     return 0;
 }
+
 
