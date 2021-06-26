@@ -296,7 +296,7 @@ public:
 
     }
     
-    void draw(SDL_Renderer *renderer) {
+    void draw(SDL_Renderer *renderer) { // Each pixel = 10x10 rectangle (window is 640x320)
         SDL_RenderClear(renderer);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_Rect rect;
@@ -312,7 +312,7 @@ public:
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     }
     
-    void handleInput(SDL_Event &event) {
+    void handleInput(SDL_Event &event) { // Map 1234qwerasdfzxv to 123c456d789ea0bf
         switch (event.type) {
             case SDL_KEYDOWN:
                 switch (event.key.keysym.sym) {
@@ -464,13 +464,13 @@ int main(int argc, const char * argv[]) {
     while(run) {
         newTime1 = SDL_GetTicks();
         newTime2 = SDL_GetTicks();
-        if (newTime1 >= oldTime1+(1/60.0)) {
+        if (newTime1 >= oldTime1+(1/60.0)) { // Draws per second
             oldTime1 = newTime1;
             chip8.updateTimers();
             chip8.draw(renderer);
         }
 
-        if (newTime2 >= oldTime2+(1/700.0)) {
+        if (newTime2 >= oldTime2+(1/700.0)) { // Instructions per second
             oldTime2 = oldTime2;
             chip8.fetch();
             chip8.execute();
@@ -484,3 +484,4 @@ int main(int argc, const char * argv[]) {
     }
     return 0;
 }
+
